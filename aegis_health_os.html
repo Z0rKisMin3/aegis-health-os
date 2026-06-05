@@ -396,49 +396,41 @@
             doc.save('aegis_rapport_'+new Date().toISOString().slice(0,10)+'.pdf');
         }
 
-        async function loadExternalData() {
-            try {
-                const resp = await fetch('aegis_data.json?_='+Date.now());
-                if (!resp.ok) return;
-                const external = await resp.json();
-                if (!Array.isArray(external) || !external.length) return;
-                const existingKeys = new Set(state.vitals.map(v => new Date(v.timestamp).getTime()));
-                const merged = state.vitals.slice();
-                let count = 0;
-                for (let entry of external) {
-                    const ts = new Date(entry.timestamp).getTime();
-                    if (ts && !existingKeys.has(ts)) {
-                        merged.push(entry);
-                        existingKeys.add(ts);
-                        count++;
-                    }
-                }
-                if (count) {
-                    merged.sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
-                    state.vitals = merged;
-                    localStorage.setItem('aegis_vitals', JSON.stringify(state.vitals));
-                    refreshDashboard();
-                    console.log('AEGIS OS: '+count+' mesures importees depuis aegis_data.json');
-                }
-            } catch(e) { /* fichier absent ou invalide, pas grave */ }
-        }
         // Seed initial data if localStorage is empty (first run)
+        // Les mesures sont embarquees directement ici (pas de fetch, compatible file://)
+        const EMBEDDED_SEED = [
+            { timestamp: '2026-06-03T22:39:00', weight: null,    glucose: 89,  systolic: null, diastolic: null },
+            { timestamp: '2026-06-05T08:00:00', weight: 74.4,     glucose: 87,  systolic: null, diastolic: null },
+            { timestamp: '2026-06-05T21:30:00', weight: null,     glucose: 129, systolic: null, diastolic: null }
+        ];
         if (!localStorage.getItem('aegis_vitals') || JSON.parse(localStorage.getItem('aegis_vitals')).length === 0) {
-            const seed = [
-                { timestamp: '2026-06-05T08:00:00', weight: 74.4, glucose: 87, systolic: null, diastolic: null }
-            ];
-            localStorage.setItem('aegis_vitals', JSON.stringify(seed));
-            state.vitals = seed;
+            localStorage.setItem('aegis_vitals', JSON.stringify(EMBEDDED_SEED));
+            state.vitals = EMBEDDED_SEED.slice();
         } else {
-            state.vitals = JSON.parse(localStorage.getItem('aegis_vitals'));
+            const stored = JSON.parse(localStorage.getItem('aegis_vitals'));
+            // Merge embedded entries missing from localStorage (dedup by timestamp ms)
+            const storedKeys = new Set(stored.map(v => new Date(v.timestamp).getTime()));
+            let added = 0;
+            for (let entry of EMBEDDED_SEED) {
+                const ts = new Date(entry.timestamp).getTime();
+                if (!isNaN(ts) && !storedKeys.has(ts)) {
+                    stored.push(entry);
+                    storedKeys.add(ts);
+                    added++;
+                }
+            }
+            if (added) {
+                stored.sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
+                localStorage.setItem('aegis_vitals', JSON.stringify(stored));
+            }
+            state.vitals = stored;
         }
 
-        window.onload = async () => {
-            await loadExternalData();
+        window.onload = () => {
             lucide.createIcons();
             updateClock();
             setInterval(updateClock, 60000);
-            refreshDashboard();
+            refresh();
             initChart();
         };
 
