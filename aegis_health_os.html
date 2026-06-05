@@ -423,14 +423,23 @@
                 }
             } catch(e) { /* fichier absent ou invalide, pas grave */ }
         }
+        // Seed initial data if localStorage is empty (first run)
+        if (!localStorage.getItem('aegis_vitals') || JSON.parse(localStorage.getItem('aegis_vitals')).length === 0) {
+            const seed = [
+                { timestamp: '2026-06-05T08:00:00', weight: 74.4, glucose: 87, systolic: null, diastolic: null }
+            ];
+            localStorage.setItem('aegis_vitals', JSON.stringify(seed));
+            state.vitals = seed;
+        } else {
+            state.vitals = JSON.parse(localStorage.getItem('aegis_vitals'));
+        }
+
         window.onload = () => {
             lucide.createIcons();
             updateClock();
-            setInterval(updateClock, 1000);
-            loadExternalData().then(() => {
-                initChart();
-                refreshDashboard();
-            });
+            setInterval(updateClock, 60000);
+            refreshDashboard();
+            initChart();
         };
 
         function initChart() {
