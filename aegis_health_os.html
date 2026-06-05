@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AEGIS HEALTH OS — Cyber-Medical Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&family=Inter:wght@400;600;800&display=swap');
+        body {
+            background: #050505;
+            color: #e0e0e0;
+            font-family: 'Inter', sans-serif;
+            background-image: radial-gradient(circle at 2px 2px, #1a1a1a 1px, transparent 0);
+            background-size: 40px 40px;
+        }
+        .cyber-card {
+            background: rgba(20,20,20,0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(0,242,255,0.2);
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            transition: all 0.3s ease;
+        }
+        .cyber-card:hover {
+            border-color: rgba(0,242,255,0.5);
+            box-shadow: 0 0 25px rgba(0,242,255,0.1);
+        }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .glow-cyan { text-shadow: 0 0 10px rgba(0,242,255,0.5); color: #00f2ff; }
+        .cyber-input {
+            background: rgba(0,0,0,0.5);
+            border: 1px solid #333;
+            color: #fff;
+            transition: border-color 0.3s ease;
+        }
+        .cyber-input:focus {
+            outline: none;
+            border-color: #00f2ff;
+            box-shadow: 0 0 10px rgba(0,242,255,0.2);
+        }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #050505; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #00f2ff; }
+        .tab-active { border-bottom: 2px solid #00f2ff; color: #00f2ff; }
+    </style>
+</head>
+<body class="p-4 md:p-8 min-h-screen">
+    <header class="max-w-7xl mx-auto mb-8 flex flex-col md:flex-row justify-between items-center gap-4">
+        <div>
+            <h1 class="text-3xl font-extrabold tracking-tighter glow-cyan mono uppercase italic">AEGIS HEALTH OS</h1>
+            <p class="text-xs text-gray-500 mono tracking-widest uppercase">Secure Personal Bio-Metric Monitoring</p>
+        </div>
+        <div id="sys-clock" class="mono text-sm text-gray-400 bg-zinc-900/50 px-4 py-2 rounded-full border border-zinc-800">--:--:--</div>
+    </header>
+
+    <main class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- LEFT: INPUTS -->
+        <section class="lg:col-span-4 space-y-6">
+            <div class="cyber-card p-6 rounded-xl">
+                <div class="flex items-center gap-2 mb-6">
+                    <i data-lucide="activity" class="text-cyan-400 w-5 h-5"></i>
+                    <h2 class="text-lg font-bold uppercase tracking-tight">New Measurement</h2>
+                </div>
+                <div class="flex gap-4 mb-6 text-xs mono border-b border-zinc-800 pb-2">
+                    <button onclick="switchTab('vitals')" id="tab-vitals" class="tab-active uppercase pb-1">Vitals</button>
+                    <button onclick="switchTab('notes')" id="tab-notes" class="text-gray-500 uppercase pb-1">Notes</button>
+                    <button onclick="switchTab('vault')" id="tab-vault" class="text-gray-500 uppercase pb-1">Vault</button>
+                </div>
+
+                <div id="panel-vitals" class="space-y-4">
+                    <div>
+                        <label class="block text-[10px] uppercase tracking-widest text-gray-500 mb-1">Weight (kg)</label>
+                        <input type="number" step="0.1" id="val-weight" placeholder="—" class="cyber-input w-full p-3 rounded bg-black/40">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] uppercase tracking-widest text-gray-500 mb-1">Glucose (mg/dL)</label>
+                        <input type="number" step="1" id="val-glucose" placeholder="—" class="cyber-input w-full p-3 rounded bg-black/40">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-[10px] uppercase tracking-widest text-gray-500 mb-1">Systolic (mmHg)</label>
+                            <input type="number" id="val-systolic" placeholder="—" class="cyber-input w-full p-3 rounded bg-black/40">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] uppercase tracking-widest text-gray-500 mb-1">Diastolic (mmHg)</label>
+                            <input type="number" id="val-diastolic" placeholder="—" class="cyber-input w-full p-3 rounded bg-black/40">
+                        </div>
+                    </div>
+                    <button onclick="saveVitals()" class="w-full py-3 mt-2 bg-cyan-600/20 border border-cyan-500/50 text-cyan-400 font-bold uppercase tracking-widest rounded hover:bg-cyan-600 hover:text-black transition-all">Execute Log</button>
+                </div>
+
+                <div id="panel-notes" class="hidden space-y-4">
+                    <textarea id="val-note" rows="4" placeholder="Symptomes, observations..." class="cyber-input w-full p-3 rounded bg-black/40 text-sm"></textarea>
+                    <button onclick="saveNote()" class="w-full py-3 mt-2 bg-cyan-600/20 border border-cyan-500/50 text-cyan-400 font-bold uppercase tracking-widest rounded hover:bg-cyan-600 hover:text-black transition-all">Archive Note</button>
+                </div>
+
+                <div id="panel-vault" class="hidden space-y-4">
+                    <input type="file" id="val-doc" accept=".pdf,.jpg,.jpeg,.png" class="text-xs text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-zinc-800 file:text-zinc-300 hover:file:bg-zinc-700 cursor-pointer">
+                    <p class="text-[10px] text-gray-500 italic">Fichiers stockés localement (localStorage)</p>
+                    <button onclick="uploadDoc()" class="w-full py-3 mt-2 bg-cyan-600/20 border border-cyan-500/50 text-cyan-400 font-bold uppercase tracking-widest rounded hover:bg-cyan-600 hover:text-black transition-all">Upload to Vault</button>
+                </div>
+            </div>
+
+            <div class="cyber-card p-6 rounded-xl border-l-4 border-l-cyan-500">
+                <h3 class="text-xs font-bold uppercase text-gray-500 mb-4 tracking-widest">System Analysis</h3>
+                <div id="analysis-container" class="space-y-4 text-sm mono">En attente de données...</div>
+            </div>
+        </section>
+
+        <!-- RIGHT: DASHBOARD -->
+        <section class="lg:col-span-8 space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="cyber-card p-5 rounded-xl flex justify-between items-center border-b-2 border-b-cyan-500">
+                    <div>
+                        <p class="text-[10px] uppercase text-gray-500 mb-1 font-bold tracking-widest">Current Weight</p>
+                        <p id="kpi-weight" class="text-2xl font-bold mono">-- kg</p>
+                    </div>
+                    <i data-lucide="scale" class="text-cyan-500 opacity-50 w-8 h-8"></i>
+                </div>
+                <div class="cyber-card p-5 rounded-xl flex justify-between items-center border-b-2 border-b-cyan-500">
+                    <div>
+                        <p class="text-[10px] uppercase text-gray-500 mb-1 font-bold tracking-widest">Glucose (mg/dL)</p>
+                        <p id="kpi-glucose" class="text-2xl font-bold mono">-- mg/dL</p>
+                    </div>
+                    <i data-lucide="droplets" class="text-cyan-500 opacity-50 w-8 h-8"></i>
+                </div>
+                <div class="cyber-card p-5 rounded-xl flex justify-between items-center border-b-2 border-b-cyan-500">
+                    <p class="text-[10px] uppercase text-gray-500 mb-1 font-bold tracking-widest">Blood Pressure</p>
+                    <p id="kpi-bp" class="text-2xl font-bold mono">--/--</p>
+                    <i data-lucide="heart-pulse" class="text-cyan-500 opacity-50 w-8 h-8"></i>
+                </div>
+            </div>
+
+            <div class="cyber-card p-6 rounded-xl min-h-[400px]">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-lg font-bold uppercase tracking-tight flex items-center gap-2">
+                        <i data-lucide="line-chart" class="text-cyan-400 w-5 h-5"></i> Biometric Trends
+                    </h2>
+                    <select id="chart-filter" onchange="refreshCharts()" class="bg-black text-[10px] uppercase mono border border-zinc-800 p-1 rounded text-gray-400 outline-none">
+                        <option value="all">All Time</option>
+                        <option value="7d">7 Days</option>
+                        <option value="30d">30 Days</option>
+                    </select>
+                </div>
+                <div class="relative h-[350px]"><canvas id="mainChart"></canvas></div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="cyber-card p-6 rounded-xl h-[300px] flex flex-col overflow-hidden">
+                    <h3 class="text-sm font-bold uppercase tracking-widest mb-4 flex items-center gap-2 text-gray-400">
+                        <i data-lucide="file-text" class="w-4 h-4"></i> Recent Logs
+                    </h3>
+                    <div id="notes-feed" class="space-y-3 overflow-y-auto pr-2 flex-grow text-xs mono italic text-gray-400"></div>
+                </div>
+                <div class="cyber-card p-6 rounded-xl h-[300px] flex flex-col overflow-hidden">
+                    <h3 class="text-sm font-bold uppercase tracking-widest mb-4 flex items-center gap-2 text-gray-400">
+                        <i data-lucide="folder-archive" class="w-4 h-4"></i> Medical Vault
+                    </h3>
+                    <div id="vault-list" class="space-y-3 overflow-y-auto pr-2 flex-grow text-xs mono"></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="max-w-7xl mx-auto mt-12 pb-8 text-center space-y-4">
+        <div class="flex justify-center gap-3 flex-wrap">
+            <button onclick="exportCSV()" class="mono text-[11px] uppercase tracking-widest bg-cyan-900/30 border border-cyan-500/40 text-cyan-400 px-6 py-2 rounded-full hover:bg-cyan-600 hover:text-black transition-all opacity-60 hover:opacity-100">
+                ⬇ Export CSV
+            </button>
+            <button onclick="exportPDF()" class="mono text-[11px] uppercase tracking-widest bg-purple-900/30 border border-purple-500/40 text-purple-400 px-6 py-2 rounded-full hover:bg-purple-600 hover:text-black transition-all opacity-60 hover:opacity-100">
+                📄 Export PDF (A4)
+            </button>
+        </div>
+        <p class="text-[10px] mono uppercase tracking-[0.3em] text-zinc-600">Secure Local Storage • Aegis Bio-System v1.0</p>
+    </footer>
+
+    <script>
+        let state = {
+            vitals: JSON.parse(localStorage.getItem('aegis_vitals')) || [],
+            notes: JSON.parse(localStorage.getItem('aegis_notes')) || [],
+            vault: JSON.parse(localStorage.getItem('aegis_vault')) || []
+        };
+        let chartInstance = null;
+
+        function updateClock() {
+            document.getElementById('sys-clock').innerText = new Date().toLocaleString('fr-FR', { hour12: false });
+        }
+
+        function switchTab(tab) {
+            ['vitals','notes','vault'].forEach(t => {
+                document.getElementById('panel-'+t).classList.add('hidden');
+                document.getElementById('tab-'+t).className = 'text-gray-500 uppercase pb-1';
+            });
+            document.getElementById('panel-'+tab).classList.remove('hidden');
+            document.getElementById('tab-'+tab).className = 'tab-active uppercase pb-1';
+        }
+
+        function persist() {
+            localStorage.setItem('aegis_vitals', JSON.stringify(state.vitals));
+            localStorage.setItem('aegis_notes', JSON.stringify(state.notes));
+            localStorage.setItem('aegis_vault', JSON.stringify(state.vault));
+        }
+
+        function saveVitals() {
+            const w = parseFloat(document.getElementById('val-weight').value);
+            const g = parseFloat(document.getElementById('val-glucose').value);
+            const s = parseInt(document.getElementById('val-systolic').value);
+            const d = parseInt(document.getElementById('val-diastolic').value);
+            if (!w && !g && !s) return;
+
+            state.vitals.push({
+                timestamp: new Date().toISOString(),
+                weight: w||null, glucose: g||null,
+                systolic: s||null, diastolic: d||null
+            });
+            persist();
+            ['val-weight','val-glucose','val-systolic','val-diastolic'].forEach(id=>document.getElementById(id).value='');
+            refresh();
+        }
+
+        function saveNote() {
+            const t = document.getElementById('val-note').value;
+            if(!t) return;
+            state.notes.unshift({ timestamp: new Date().toISOString(), content: t });
+            persist();
+            document.getElementById('val-note').value='';
+            refresh();
+        }
+
+        function uploadDoc() {
+            const f = document.getElementById('val-doc').files[0];
+            if(!f) return;
+            const reader = new FileReader();
+            reader.onload = e => {
+                state.vault.unshift({ name: f.name, type: f.type, data: e.target.result, timestamp: new Date().toISOString() });
+                persist();
+                document.getElementById('val-doc').value='';
+                refresh();
+            };
+            reader.readAsDataURL(f);
+        }
+
+        function refresh() {
+            const v = state.vitals;
+            if(v.length) {
+                const last = v[v.length-1];
+                if(last.weight) document.getElementById('kpi-weight').innerText = last.weight+' kg';
+                if(last.glucose) document.getElementById('kpi-glucose').innerText = last.glucose+' mg/dL';
+                if(last.systolic && last.diastolic) document.getElementById('kpi-bp').innerText = last.systolic+'/'+last.diastolic;
+            }
+
+            const feed = document.getElementById('notes-feed');
+            feed.innerHTML = state.notes.length ? '' : '<p class="text-gray-500">Aucune note.</p>';
+            state.notes.slice(0,15).forEach(n => {
+                const d = document.createElement('div');
+                d.className = 'border-l border-zinc-800 pl-3 py-1';
+                d.innerHTML = `<span class="text-[9px] text-cyan-500 block uppercase">${new Date(n.timestamp).toLocaleDateString()}</span><p class="text-gray-400">${n.content}</p>`;
+                feed.appendChild(d);
+            });
+
+            const vl = document.getElementById('vault-list');
+            vl.innerHTML = state.vault.length ? '' : '<p class="text-gray-500">Vault vide.</p>';
+            state.vault.forEach((f,i) => {
+                const d = document.createElement('div');
+                d.className='flex justify-between p-2 bg-zinc-900/50 rounded hover:bg-zinc-800 group';
+                d.innerHTML = `<span class="truncate text-[11px]">${f.name}</span><button onclick="window.open('${f.data}')" class="opacity-0 group-hover:opacity-100 bg-cyan-500 text-black px-1 rounded text-[10px]">Voir</button>`;
+                vl.appendChild(d);
+            });
+
+            // Analysis
+            const analysis = document.getElementById('analysis-container');
+            if(v.length<2) { analysis.innerHTML = '<p class="text-gray-500 italic">Plus de donnees necessaires...</p>'; return; }
+            let html='';
+            const c=v[v.length-1], p=v[v.length-2];
+            if(c.weight && p.weight) {
+                const diff = (c.weight-p.weight).toFixed(2);
+                html+=`<div class="flex justify-between"><span>Poids Δ</span><span class="${diff<=0?'text-cyan-400':'text-red-400'} font-bold">${diff<=0?'📉':'📈'} ${diff>0?'+':''}${diff} kg</span></div>`;
+            }
+            if(c.glucose && p.glucose) {
+                const diff = (c.glucose-p.glucose).toFixed(1);
+                html+=`<div class="flex justify-between"><span>Glucose Δ</span><span class="${diff<=0?'text-cyan-400':'text-red-400'} font-bold">${diff<=0?'📉':'📈'} ${diff>0?'+':''}${diff} mg/dL</span></div>`;
+            }
+            const avgG = (v.reduce((a,b)=>a+(b.glucose||0),0)/v.filter(x=>x.glucose).length).toFixed(1);
+            if(avgG>0) html+=`<div class="pt-2 border-t border-zinc-800 mt-2 text-[11px]"><span class="text-gray-500 uppercase">Moy. Glucose:</span> <span class="text-cyan-400 font-bold">${avgG} mg/dL</span></div>`;
+            analysis.innerHTML = html||'<p class="text-gray-500">Collecte en cours...</p>';
+
+            refreshCharts();
+        }
+
+        function refreshCharts() {
+            if(!chartInstance) return;
+            const labels = state.vitals.map(v=>new Date(v.timestamp).toLocaleDateString('fr-FR',{day:'2d',month:'short'}));
+            chartInstance.data.labels = labels;
+            chartInstance.data.datasets = [
+                { label:'Weight (kg)', data:state.vitals.map(v=>v.weight), borderColor:'#00f2ff', backgroundColor:'rgba(0,242,255,0.1)', tension:0.4, fill:true, borderWidth:2 },
+                { label:'Glucose (mg/dL)', data:state.vitals.map(v=>v.glucose), borderColor:'#ff4b2b', backgroundColor:'rgba(255,75,43,0.1)', tension:0.4, fill:true, borderWidth:2 },
+                { label:'Systolic (mmHg)', data:state.vitals.map(v=>v.systolic), borderColor:'#facc15', tension:0.4, borderWidth:1, pointRadius:3 }
+            ];
+            chartInstance.update();
+        }
+
+        function exportCSV() {
+            const d = state.vitals;
+            if(!d.length) return alert('Aucune mesure a exporter.');
+            const sep = ',';
+            let csv = 'Date,Heure,Poids_kg,Glucose_mgdL,Systolique_mmHg,Diastolique_mmHg,Sys_Dia_brut\n';
+            d.forEach(v => {
+                const dt = new Date(v.timestamp);
+                const date = dt.toLocaleDateString('fr-CA'); // YYYY-MM-DD
+                const time = dt.toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'});
+                csv += [
+                    date, time,
+                    v.weight??'', v.glucose??'',
+                    v.systolic??'', v.diastolic??'',
+                    v.systolic||v.diastolic ? `${v.systolic||'?'}/${v.diastolic||'?'}` : ''
+                ].join(sep) + '\n';
+            });
+            const blob = new Blob(['\ufeff'+csv], {type:'text/csv;charset=utf-8;'});
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `aegis_export_${new Date().toISOString().slice(0,10)}.csv`;
+            a.click();
+            URL.revokeObjectURL(a.href);
+        }
+        function exportPDF() {
+            const v = state.vitals;
+            if (!v.length) return alert('Aucune mesure a exporter.');
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4');
+            const pw = 210;
+            let y = 20;
+            doc.setFontSize(22);
+            doc.setTextColor(0, 163, 183);
+            doc.text('AEGIS HEALTH OS', pw/2, y, { align:'center' });
+            doc.setFontSize(9);
+            doc.setTextColor(130);
+            doc.text('Rapport du '+new Date().toLocaleDateString('fr-FR'), pw/2, y+7, { align:'center' });
+            y += 16;
+            doc.setDrawColor(0, 163, 183);
+            doc.setLineWidth(0.5);
+            doc.line(15, y, 195, y);
+            y += 8;
+            const last = v[v.length-1];
+            doc.setFontSize(12);
+            doc.setTextColor(0);
+            doc.setFont(undefined, 'bold');
+            doc.text('Dernieres mesures', 15, y);
+            doc.setFont(undefined, 'normal');
+            y += 7;
+            let parts = [];
+            if (last.weight) parts.push('Poids: '+last.weight+' kg');
+            if (last.glucose) parts.push('Glycemie: '+last.glucose+' mg/dL');
+            if (last.systolic&&last.diastolic) parts.push('Tension: '+last.systolic+'/'+last.diastolic+' mmHg');
+            parts.push(new Date(last.timestamp).toLocaleDateString('fr-FR'));
+            doc.setFontSize(10);
+            doc.text(parts.join('  |  '), 15, y);
+            y += 12;
+            const avgC = v.filter(x=>x.glucose).length;
+            if (avgC) {
+                const m = (v.reduce((a,b)=>a+(b.glucose||0),0)/avgC).toFixed(1);
+                doc.setFontSize(10);
+                doc.setTextColor(80);
+                doc.text('Glycemie moyenne ('+avgC+' mesures): '+m+' mg/dL', 15, y);
+                y += 12;
+            }
+            doc.setFontSize(9);
+            doc.setFont(undefined, 'bold');
+            doc.setTextColor(60);
+            doc.text('Date', 15, y);
+            doc.text('Poids (kg)', 55, y);
+            doc.text('Glycemie (mg/dL)', 95, y);
+            doc.text('Tension (mmHg)', 140, y);
+            doc.setFont(undefined, 'normal');
+            doc.setDrawColor(200);
+            doc.line(15, y+1, 195, y+1);
+            y += 7;
+            const rows = v.slice(-50);
+            doc.setTextColor(30);
+            doc.setFontSize(9);
+            for (let r of rows) {
+                if (y > 278) { doc.addPage(); y = 20; }
+                doc.text(new Date(r.timestamp).toLocaleDateString('fr-FR'), 15, y);
+                doc.text(r.weight ? r.weight.toString() : '-', 55, y);
+                doc.text(r.glucose ? r.glucose.toString() : '-', 95, y);
+                doc.text(r.systolic&&r.diastolic ? r.systolic+'/'+r.diastolic : '-', 140, y);
+                y += 5.5;
+            }
+            doc.setFontSize(8);
+            doc.setTextColor(180);
+            doc.text('Genere par AEGIS HEALTH OS — Donnees stockees localement', pw/2, 290, { align:'center' });
+            doc.save('aegis_rapport_'+new Date().toISOString().slice(0,10)+'.pdf');
+        }
+
+        async function loadExternalData() {
+            try {
+                const resp = await fetch('aegis_data.json?_='+Date.now());
+                if (!resp.ok) return;
+                const external = await resp.json();
+                if (!Array.isArray(external) || !external.length) return;
+                const existingKeys = new Set(state.vitals.map(v => new Date(v.timestamp).getTime()));
+                const merged = state.vitals.slice();
+                let count = 0;
+                for (let entry of external) {
+                    const ts = new Date(entry.timestamp).getTime();
+                    if (ts && !existingKeys.has(ts)) {
+                        merged.push(entry);
+                        existingKeys.add(ts);
+                        count++;
+                    }
+                }
+                if (count) {
+                    merged.sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
+                    state.vitals = merged;
+                    localStorage.setItem('aegis_vitals', JSON.stringify(state.vitals));
+                    refreshDashboard();
+                    initChart();
+                    console.log('AEGIS OS: '+count+' mesures importees depuis aegis_data.json');
+                }
+            } catch(e) { /* fichier absent ou invalide, pas grave */ }
+        }
+        window.onload = () => {
+            lucide.createIcons();
+            updateClock();
+            setInterval(updateClock, 1000);
+            loadExternalData().then(() => {
+                initChart();
+                refreshDashboard();
+            });
+        };
+
+        function initChart() {
+            const ctx = document.getElementById('mainChart').getContext('2d');
+            chartInstance = new Chart(ctx, {
+                type:'line',
+                data:{datasets:[]},
+                options:{
+                    responsive:true, maintainAspectRatio:false,
+                    scales:{
+                        x:{ type:'category', grid:{color:'#1a1a1a'}, ticks:{color:'#666',font:{size:10}} },
+                        y:{ grid:{color:'#1a1a1a'}, ticks:{color:'#666',font:{size:10}} }
+                    },
+                    plugins:{ legend:{ labels:{ color:'#ccc', font:{ family:'JetBrains Mono', size:11 } } } }
+                }
+            });
+            refreshCharts();
+        }
+
+        function refreshCharts() {
+            if (!chartInstance) return;
+            const labels = state.vitals.map(v => new Date(v.timestamp).toLocaleDateString('fr-FR', { day:'2d', month:'short' }));
+            const w = state.vitals.map(v => v.weight);
+            const g = state.vitals.map(v => v.glucose);
+            chartInstance.data.labels = labels;
+            chartInstance.data.datasets = [
+                { label:'Weight (kg)', data:w, borderColor:'#00f2ff', backgroundColor:'rgba(0,242,255,0.1)', tension:0.4, borderWidth:2, fill:true },
+                { label:'Glucose (mg/dL)', data:g, borderColor:'#ff4b2b', backgroundColor:'rgba(255,75,43,0.1)', tension:0.4, borderWidth:2, fill:true }
+            ];
+            chartInstance.update();
+        }
+    </script>
+</body>
+</html>
