@@ -418,7 +418,6 @@
                     state.vitals = merged;
                     localStorage.setItem('aegis_vitals', JSON.stringify(state.vitals));
                     refreshDashboard();
-                    initChart();
                     console.log('AEGIS OS: '+count+' mesures importees depuis aegis_data.json');
                 }
             } catch(e) { /* fichier absent ou invalide, pas grave */ }
@@ -434,7 +433,8 @@
             state.vitals = JSON.parse(localStorage.getItem('aegis_vitals'));
         }
 
-        window.onload = () => {
+        window.onload = async () => {
+            await loadExternalData();
             lucide.createIcons();
             updateClock();
             setInterval(updateClock, 60000);
