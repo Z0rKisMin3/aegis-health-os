@@ -206,6 +206,12 @@
             localStorage.setItem('aegis_vault', JSON.stringify(state.vault));
         }
 
+        function deleteNote(index) {
+            state.notes.splice(index, 1);
+            persist();
+            refresh();
+        }
+
         function saveVitals() {
             const w = parseFloat(document.getElementById('val-weight').value);
             const g = parseFloat(document.getElementById('val-glucose').value);
@@ -256,10 +262,10 @@
 
             const feed = document.getElementById('notes-feed');
             feed.innerHTML = state.notes.length ? '' : '<p class="text-gray-500">Aucune note.</p>';
-            state.notes.slice(0,15).forEach(n => {
+            state.notes.slice(0,15).forEach((n,i) => {
                 const d = document.createElement('div');
-                d.className = 'border-l border-zinc-800 pl-3 py-1';
-                d.innerHTML = `<span class="text-[9px] text-cyan-500 block uppercase">${new Date(n.timestamp).toLocaleDateString()}</span><p class="text-gray-400">${n.content}</p>`;
+                d.className = 'border-l border-zinc-800 pl-3 py-1 flex justify-between items-start group';
+                d.innerHTML = `<div><span class="text-[9px] text-cyan-500 block uppercase">${new Date(n.timestamp).toLocaleDateString()}</span><p class="text-gray-400 text-xs">${n.content}</p></div><button onclick="deleteNote(${i})" class="text-red-500 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] hover:text-red-300 ml-2 shrink-0" title="Supprimer">✕</button>`;
                 feed.appendChild(d);
             });
 
@@ -398,10 +404,19 @@
 
         // Seed initial data if localStorage is empty (first run)
         // Les mesures sont embarquees directement ici (pas de fetch, compatible file://)
+        // Derniere synchro CSV: 05/06/2026
         const EMBEDDED_SEED = [
-            { timestamp: '2026-06-03T22:39:00', weight: null,    glucose: 89,  systolic: null, diastolic: null },
-            { timestamp: '2026-06-05T08:00:00', weight: 74.4,     glucose: 87,  systolic: null, diastolic: null },
-            { timestamp: '2026-06-05T21:30:00', weight: null,     glucose: 129, systolic: null, diastolic: null }
+            { timestamp: '2026-05-30T09:27:00', weight: 74.7, glucose: 101, systolic: null, diastolic: null },
+            { timestamp: '2026-05-30T23:02:00', weight: null,  glucose: 75,  systolic: null, diastolic: null },
+            { timestamp: '2026-05-31T08:42:00', weight: 74.7, glucose: 100, systolic: null, diastolic: null },
+            { timestamp: '2026-05-31T15:07:00', weight: null,  glucose: 97,  systolic: null, diastolic: null },
+            { timestamp: '2026-06-01T08:00:00', weight: 74.7, glucose: null, systolic: null, diastolic: null },
+            { timestamp: '2026-06-02T08:00:00', weight: 74.5, glucose: null, systolic: null, diastolic: null },
+            { timestamp: '2026-06-02T22:59:00', weight: null,  glucose: 82,  systolic: null, diastolic: null },
+            { timestamp: '2026-06-03T16:32:00', weight: null,  glucose: 71,  systolic: null, diastolic: null },
+            { timestamp: '2026-06-03T22:39:00', weight: null,  glucose: 89,  systolic: null, diastolic: null },
+            { timestamp: '2026-06-05T08:00:00', weight: 74.4, glucose: null, systolic: null, diastolic: null },
+            { timestamp: '2026-06-06T08:15:00', weight: 74.1, glucose: 99,  systolic: 100, diastolic: 69 }
         ];
         if (!localStorage.getItem('aegis_vitals') || JSON.parse(localStorage.getItem('aegis_vitals')).length === 0) {
             localStorage.setItem('aegis_vitals', JSON.stringify(EMBEDDED_SEED));
@@ -439,9 +454,11 @@
             chartInstance = new Chart(ctx, {
                 type:'line',
                 data:{datasets:[]},
-                options:{
-                    responsive:true, maintainAspectRatio:false,
-                    scales:{
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    spanGaps: true,
+                    scales: {
                         x:{ type:'category', grid:{color:'#1a1a1a'}, ticks:{color:'#666',font:{size:10}} },
                         y:{ grid:{color:'#1a1a1a'}, ticks:{color:'#666',font:{size:10}} }
                     },
@@ -453,13 +470,15 @@
 
         function refreshCharts() {
             if (!chartInstance) return;
-            const labels = state.vitals.map(v => new Date(v.timestamp).toLocaleDateString('fr-FR', { day:'2d', month:'short' }));
+            const labels = state.vitals.map(v => new Date(v.timestamp).toLocaleDateString('fr-FR', { day:'2-digit', month:'short' }));
             const w = state.vitals.map(v => v.weight);
             const g = state.vitals.map(v => v.glucose);
+            const s = state.vitals.map(v => v.systolic);
             chartInstance.data.labels = labels;
             chartInstance.data.datasets = [
-                { label:'Weight (kg)', data:w, borderColor:'#00f2ff', backgroundColor:'rgba(0,242,255,0.1)', tension:0.4, borderWidth:2, fill:true },
-                { label:'Glucose (mg/dL)', data:g, borderColor:'#ff4b2b', backgroundColor:'rgba(255,75,43,0.1)', tension:0.4, borderWidth:2, fill:true }
+                { label:'Poids (kg)', data:w, borderColor:'#00f2ff', backgroundColor:'rgba(0,242,255,0.1)', tension:0.4, borderWidth:2, fill:true, pointRadius:3 },
+                { label:'Glycemie (mg/dL)', data:g, borderColor:'#ff4b2b', backgroundColor:'rgba(255,75,43,0.1)', tension:0.4, borderWidth:2, fill:true, pointRadius:3 },
+                { label:'Systolique (mmHg)', data:s, borderColor:'#facc15', backgroundColor:'rgba(250,204,21,0.1)', tension:0.4, borderWidth:2, fill:true, pointRadius:3 }
             ];
             chartInstance.update();
         }
